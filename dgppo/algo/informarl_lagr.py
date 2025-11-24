@@ -260,7 +260,7 @@ class InforMARLLagr(InforMARL):
             bT_rnn_states: Array,
             rnn_chunk_ids: Array
     ) -> Tuple[TrainState, dict]:
-        bcT_rollout = jax.tree_map(lambda x: x[:, rnn_chunk_ids], rollout)
+        bcT_rollout = jtu.tree_map(lambda x: x[:, rnn_chunk_ids], rollout)
         bcTah_Qh = bTah_Qh[:, rnn_chunk_ids]
         bc_rnn_state_inits = jnp.zeros_like(bT_rnn_states[:, rnn_chunk_ids[:, 0]])  # use zeros rnn_state as init
 

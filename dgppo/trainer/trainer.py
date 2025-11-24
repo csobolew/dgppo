@@ -13,6 +13,7 @@ from .data import Rollout
 from .utils import test_rollout
 from ..env import MultiAgentEnv
 from ..algo.base import Algorithm
+from ..utils.utils import tree_index
 
 
 class Trainer:
@@ -111,16 +112,32 @@ class Trainer:
                 reward_final = np.mean(test_rollouts.rewards[:, -1])
                 cost = jnp.maximum(test_rollouts.costs, 0.0).max(axis=-1).max(axis=-1).sum(axis=-1).mean()
                 unsafe_frac = np.mean(test_rollouts.costs.max(axis=-1).max(axis=-2) >= 1e-6)
+                final_graphs = tree_index(test_rollouts.next_graph, (slice(None), -1))
+
+                goal_tol = self.env_test.params.get(
+                    "dist2goal",
+                    self.env_test.params.get("car_radius", 0.05)
+                )
+                num_goals = getattr(self.env_test, "num_goals", self.env_test.num_agents)
+
+                def completion_fn(graph):
+                    agent_final = graph.type_states(type_idx=0, n_type=self.env_test.num_agents)
+                    goal_final = graph.type_states(type_idx=1, n_type=num_goals)
+                    dist_final = jnp.linalg.norm(agent_final[..., :2] - goal_final[..., :2], axis=-1)
+                    return jnp.mean(dist_final <= goal_tol)
+
+                completion = jnp.mean(jax.vmap(completion_fn)(final_graphs))
                 eval_info = eval_info | {
                     "eval/reward": reward_mean,
                     "eval/reward_final": reward_final,
                     "eval/cost": cost,
                     "eval/unsafe_frac": unsafe_frac,
+                    "eval/completion": completion,
                 }
                 time_since_start = time() - start_time
                 eval_verbose = (f'step: {step:3}, time: {time_since_start:5.0f}s, reward: {reward_mean:9.4f}, '
                                 f'min/max reward: {reward_min:7.2f}/{reward_max:7.2f}, cost: {cost:8.4f}, '
-                                f'unsafe_frac: {unsafe_frac:6.2f}')
+                                f'unsafe_frac: {unsafe_frac:6.2f}, completion: {float(completion):6.2f}')
                 tqdm.write(eval_verbose)
                 wandb.log(eval_info, step=self.update_steps)
 

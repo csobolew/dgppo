@@ -4,6 +4,7 @@ from .base import MultiAgentEnv
 from dgppo.env.mpe import MPETarget, MPESpread, MPELine, MPEFormation, MPECorridor, MPEConnectSpread
 from dgppo.env.lidar_env import LidarSpread, LidarTarget, LidarLine, LidarBicycleTarget
 from dgppo.env.vmas import VMASWheel, VMASReverseTransport
+from dgppo.env.quadruped_accel import QuadrupedAccel
 
 
 ENV = {
@@ -20,10 +21,11 @@ ENV = {
     'LidarBicycleTarget': LidarBicycleTarget,
     'VMASReverseTransport': VMASReverseTransport,
     'VMASWheel': VMASWheel,
+    'QuadrupedAccel': QuadrupedAccel,
 }
 
 
-DEFAULT_MAX_STEP = 128
+DEFAULT_MAX_STEP = 512
 
 
 def make_env(
