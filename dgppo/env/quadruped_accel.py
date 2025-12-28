@@ -37,11 +37,11 @@ class QuadrupedAccel(MultiAgentEnv):
 
     PARAMS = {
         "car_radius": 0.55 / ENV_SIZE,
-        "comm_radius": 1.0 / 3.0,
+        "comm_radius": 1.0 / 4.0,
         "n_rays": 32,
         "top_k_rays": 8,
-        "obs_len_range": [0.5/15.0, 0.5/5.0],
-        "n_obs": 3,
+        "obs_len_range": [0.5/15.0, 1.25/5.0],
+        "n_obs": 8,
         "action_lower": np.array([-1.50 / ENV_SIZE, -1.50 / ENV_SIZE, -2.0]),
         "action_upper": np.array([1.50 / ENV_SIZE, 1.50 / ENV_SIZE, 2.0]),
         "default_area_size": 1.0,

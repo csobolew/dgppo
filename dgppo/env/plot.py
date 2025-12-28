@@ -695,6 +695,11 @@ def render_video(
         if dim == 2:
             for ii in range(n_agent):
                 agent_circs[ii].set_center(tuple(n_pos_t[ii]))
+            # Also update goal circles (indices n_agent to n_agent * 2)
+            for ii in range(n_agent):
+                goal_idx = n_agent + ii
+                if goal_idx < len(agent_circs):
+                    agent_circs[goal_idx].set_center(tuple(n_pos_t[goal_idx]))
 
             if show_orientation and graph.states.shape[1] >= 3:
                 for ii in range(n_agent):

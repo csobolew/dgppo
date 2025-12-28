@@ -5,6 +5,7 @@ from dgppo.env.mpe import MPETarget, MPESpread, MPELine, MPEFormation, MPECorrid
 from dgppo.env.lidar_env import LidarSpread, LidarTarget, LidarLine, LidarBicycleTarget
 from dgppo.env.vmas import VMASWheel, VMASReverseTransport
 from dgppo.env.quadruped_accel import QuadrupedAccel
+from dgppo.env.quadruped_corridor import QuadrupedCorridor
 
 
 ENV = {
@@ -22,6 +23,7 @@ ENV = {
     'VMASReverseTransport': VMASReverseTransport,
     'VMASWheel': VMASWheel,
     'QuadrupedAccel': QuadrupedAccel,
+    'QuadrupedCorridor': QuadrupedCorridor,
 }
 
 
@@ -35,9 +37,11 @@ def make_env(
         full_observation: bool = False,
         num_obs: Optional[int] = None,
         n_rays: Optional[int] = None,
+        **kwargs
 ) -> MultiAgentEnv:
     assert env_id in ENV.keys(), f'Environment {env_id} not implemented.'
-    params = ENV[env_id].PARAMS
+    import copy
+    params = copy.deepcopy(ENV[env_id].PARAMS)
     max_step = DEFAULT_MAX_STEP if max_step is None else max_step
     if num_obs is not None:
         params['n_obs'] = num_obs
@@ -46,6 +50,10 @@ def make_env(
     if full_observation:
         area_size = params['default_area_size']
         params['comm_radius'] = area_size * 10
+    # Add any additional kwargs to params
+    for key, value in kwargs.items():
+        if value is not None:
+            params[key] = value
     return ENV[env_id](
         num_agents=num_agents,
         area_size=None,

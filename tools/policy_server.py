@@ -382,6 +382,7 @@ def world_state_to_graph(payload: Dict[str, Any], env) -> GraphsTuple:
 
     obstacle_entries = payload.get("obstacles", [])
     obstacle_array = np.asarray(obstacle_entries, dtype=np.float32)
+    print(obstacle_array)
     rectangles = rectangles_from_obstacles(env, obstacle_array)
 
     env_state = env.EnvState(jnp.array(agents_scaled, dtype=jnp.float32),
