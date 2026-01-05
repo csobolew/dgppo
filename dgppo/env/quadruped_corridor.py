@@ -365,7 +365,8 @@ class QuadrupedCorridor(MultiAgentEnv):
         
         # Generate open space obstacles, ensuring they don't intersect with goals
         # Use rejection sampling with JAX-compatible approach
-        min_goal_clearance = car_radius * 2.5  # Minimum distance from goals
+        # Use larger clearance to account for rotation and goal validation requirements
+        min_goal_clearance = car_radius * 3.5  # Minimum distance from goals (increased for safety)
         
         def attempt_obstacle(attempt_key):
             """Attempt to generate one obstacle."""
@@ -388,24 +389,26 @@ class QuadrupedCorridor(MultiAgentEnv):
             obstacle_theta = jr.uniform(theta_key, (), minval=0.0, maxval=2 * jnp.pi)
             
             # Check if this obstacle intersects with any goals
-            # Create a temporary obstacle in unrotated coordinates to check collision
-            # Use proper Rectangle collision detection with expanded size for clearance
+            # We need to ensure goals are at least min_goal_clearance away from obstacle edges
+            # The Rectangle.inside method with r checks if point is within r of rectangle edges
+            # Strategy: expand obstacle by min_goal_clearance, then check with r=0 for exact inside check
+            # This ensures goals are at least min_goal_clearance away from obstacle boundaries
             if goal_positions_unrotated is not None and goal_positions_unrotated.shape[0] > 0:
-                # Create temporary obstacle for collision checking
-                # Expand obstacle size to account for goal clearance (goals are points, so we need clearance around them)
-                # The clearance should account for the fact that goals will be checked with radius later
-                temp_obstacle_size = obstacle_size + min_goal_clearance * 2
+                # Expand obstacle by min_goal_clearance on all sides
+                # This creates a "no-go zone" around the obstacle
+                expanded_size = obstacle_size + min_goal_clearance * 2
                 temp_obstacle = Rectangle.create(
                     obstacle_pos,
-                    temp_obstacle_size,
-                    temp_obstacle_size,
+                    expanded_size,
+                    expanded_size,
                     obstacle_theta
                 )
-                # Check if any goal is inside this expanded obstacle (with additional margin)
-                # Use the obstacle's inside method directly for each goal (since it's a single obstacle)
-                clearance_radius = car_radius * 0.5
+                # Check if any goal is inside the expanded obstacle
+                # Use r=0 for exact inside check, then add safety margin for edge cases
+                # The safety margin accounts for numerical precision and rotation effects
+                safety_margin = car_radius * 0.5  # Increased safety margin
                 goal_intersections = jax.vmap(
-                    lambda goal: temp_obstacle.inside(goal, r=clearance_radius)
+                    lambda goal: temp_obstacle.inside(goal, r=safety_margin)
                 )(goal_positions_unrotated)
                 has_intersection = jnp.any(goal_intersections)
             else:
@@ -662,17 +665,20 @@ class QuadrupedCorridor(MultiAgentEnv):
             )
             
             # Check if goal intersects with obstacles (with sufficient clearance)
-            goal_clearance = car_radius * 2.0  # Clearance around goal
+            # Use larger clearance to match the min_goal_clearance used in obstacle generation
+            # This ensures consistency between obstacle placement and goal validation
+            goal_clearance = car_radius * 2.5  # Increased to match min_goal_clearance logic
             goal_intersects = inside_obstacles(goal_pos_rotated, obstacles, r=goal_clearance)
             
             # If goal intersects, try multiple times to find a nearby valid position
             # Use rejection sampling with small random offsets
-            max_attempts = 5  # Reduced from 10 for better performance
+            max_attempts = 10  # Increased to ensure we find a valid position
             offset_key, key = jr.split(key, 2)
             offset_keys = jr.split(offset_key, max_attempts)
             
             def try_offset(offset_key):
-                max_offset = car_radius * 3.0
+                # Try larger offsets to find valid positions
+                max_offset = car_radius * 4.0  # Increased from 3.0
                 offset = jr.uniform(offset_key, (2,), minval=-max_offset, maxval=max_offset)
                 candidate_pos = goal_pos_rotated + offset
                 candidate_pos = jnp.clip(
@@ -691,11 +697,35 @@ class QuadrupedCorridor(MultiAgentEnv):
             valid_indices = jnp.where(valid_candidates, jnp.arange(max_attempts), max_attempts)
             first_valid_idx = jnp.argmin(valid_indices)
             
-            # Use first valid candidate if goal intersects, otherwise use original
+            # Check if we found a valid candidate
+            found_valid = valid_indices[first_valid_idx] < max_attempts
+            
+            # Use first valid candidate if goal intersects and we found one, otherwise keep original
+            # If we can't find a valid position, the goal might still intersect, but we'll use best effort
             candidate_pos = candidates[0][first_valid_idx]
             goal_pos_rotated = jnp.where(
-                goal_intersects,
+                jnp.logical_and(goal_intersects, found_valid),
                 candidate_pos,
+                goal_pos_rotated
+            )
+            
+            # Final check: if still intersecting after correction attempt, try one more aggressive correction
+            goal_intersects_final = inside_obstacles(goal_pos_rotated, obstacles, r=goal_clearance)
+            # If still intersecting, try moving goal further away from nearest obstacle
+            # This is a fallback to prevent goals from being placed in obstacles
+            # Use JAX-compatible conditional
+            final_correction_key, key = jr.split(key, 2)
+            final_offset = jr.uniform(final_correction_key, (2,), minval=-car_radius * 5.0, maxval=car_radius * 5.0)
+            goal_pos_with_final_offset = goal_pos_rotated + final_offset
+            goal_pos_with_final_offset = jnp.clip(
+                goal_pos_with_final_offset,
+                car_radius + 0.01 * area_size,
+                area_size - car_radius - 0.01 * area_size
+            )
+            # Use final offset position if still intersecting, otherwise keep current position
+            goal_pos_rotated = jnp.where(
+                goal_intersects_final,
+                goal_pos_with_final_offset,
                 goal_pos_rotated
             )
             

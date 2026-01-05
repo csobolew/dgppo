@@ -357,7 +357,8 @@ def render_mpe(
             norm = centered_norm(Tbb_h.min(), Tbb_h.max())
             levels = np.linspace(norm.vmin, norm.vmax, 15)
 
-            cmap = get_BuRd().reversed()
+            # Use RdYlBu_r colormap: Red=high (safer), Blue=low (less safe)
+            cmap = 'RdYlBu_r'
             contour_opts = dict(cmap=cmap, norm=norm, levels=levels, alpha=0.9)
             cnt = ax.contourf(bb_Xs, bb_Ys, Tbb_h[0], **contour_opts)
 
@@ -368,7 +369,15 @@ def render_mpe(
             cbar.add_lines(cnt_line)
             cbar.ax.tick_params(labelsize=36, labelfontfamily="Times New Roman")
 
-            cnt_col = [*cnt.collections, *cnt_line.collections]
+            # Handle both old and new matplotlib API
+            # Newer matplotlib versions: QuadContourSet doesn't have .collections
+            # Older versions: use .collections attribute
+            try:
+                cnt_col = [*cnt.collections, *cnt_line.collections]
+            except AttributeError:
+                # New matplotlib API - QuadContourSet objects themselves are the artists
+                # They can be used directly in the artist list
+                cnt_col = [cnt, cnt_line]
 
             ax.text(0.5, 1.0, "CBF for {}".format(cbf_num), transform=ax.transAxes, va="bottom")
     if "Vh" in viz_opts:
@@ -665,7 +674,8 @@ def render_video(
             norm = centered_norm(Tbb_h.min(), Tbb_h.max())
             levels = np.linspace(norm.vmin, norm.vmax, 15)
 
-            cmap = get_BuRd().reversed()
+            # Use RdYlBu_r colormap: Red=high (safer), Blue=low (less safe)
+            cmap = 'RdYlBu_r'
             contour_opts = dict(cmap=cmap, norm=norm, levels=levels, alpha=0.9)
             cnt = ax.contourf(bb_Xs, bb_Ys, Tbb_h[0], **contour_opts)
 
@@ -676,7 +686,15 @@ def render_video(
             cbar.add_lines(cnt_line)
             cbar.ax.tick_params(labelsize=36, labelfontfamily="Times New Roman")
 
-            cnt_col = [*cnt.collections, *cnt_line.collections]
+            # Handle both old and new matplotlib API
+            # Newer matplotlib versions: QuadContourSet doesn't have .collections
+            # Older versions: use .collections attribute
+            try:
+                cnt_col = [*cnt.collections, *cnt_line.collections]
+            except AttributeError:
+                # New matplotlib API - QuadContourSet objects themselves are the artists
+                # They can be used directly in the artist list
+                cnt_col = [cnt, cnt_line]
 
             ax.text(0.5, 1.0, "CBF for {}".format(cbf_num), transform=ax.transAxes, va="bottom")
 
@@ -804,16 +822,34 @@ def render_video(
 
         nonlocal cnt, cnt_line
         if "cbf" in viz_opts and dim == 2 and cnt is not None and cnt_line is not None:
-            for c in cnt.collections:
-                c.remove()
-            for c in cnt_line.collections:
-                c.remove()
+            # Handle both old and new matplotlib API
+            try:
+                for c in cnt.collections:
+                    c.remove()
+                for c in cnt_line.collections:
+                    c.remove()
+            except AttributeError:
+                # New matplotlib API - remove the artists directly
+                try:
+                    cnt.remove()
+                    cnt_line.remove()
+                except (AttributeError, ValueError):
+                    # If remove doesn't work, try removing from axes
+                    if cnt in ax.collections:
+                        ax.collections.remove(cnt)
+                    if cnt_line in ax.collections:
+                        ax.collections.remove(cnt_line)
 
             bb_Xs_t, bb_Ys_t = np.meshgrid(Tb_xs[kk], Tb_ys[kk])
             cnt = ax.contourf(bb_Xs_t, bb_Ys_t, Tbb_h[kk], **contour_opts)
             cnt_line = ax.contour(bb_Xs_t, bb_Ys_t, Tbb_h[kk], **contour_line_opts)
 
-            cnt_col_t = [*cnt.collections, *cnt_line.collections]
+            # Handle both old and new matplotlib API
+            try:
+                cnt_col_t = [*cnt.collections, *cnt_line.collections]
+            except AttributeError:
+                # New matplotlib API - use the contour objects directly
+                cnt_col_t = [cnt, cnt_line]
         else:
             cnt_col_t = []
 
@@ -983,7 +1019,8 @@ def render_lidar(
             norm = centered_norm(Tbb_h.min(), Tbb_h.max())
             levels = np.linspace(norm.vmin, norm.vmax, 15)
 
-            cmap = get_BuRd().reversed()
+            # Use RdYlBu_r colormap: Red=high (safer), Blue=low (less safe)
+            cmap = 'RdYlBu_r'
             contour_opts = dict(cmap=cmap, norm=norm, levels=levels, alpha=0.9)
             cnt = ax.contourf(bb_Xs, bb_Ys, Tbb_h[0], **contour_opts)
 
@@ -994,7 +1031,15 @@ def render_lidar(
             cbar.add_lines(cnt_line)
             cbar.ax.tick_params(labelsize=36, labelfontfamily="Times New Roman")
 
-            cnt_col = [*cnt.collections, *cnt_line.collections]
+            # Handle both old and new matplotlib API
+            # Newer matplotlib versions: QuadContourSet doesn't have .collections
+            # Older versions: use .collections attribute
+            try:
+                cnt_col = [*cnt.collections, *cnt_line.collections]
+            except AttributeError:
+                # New matplotlib API - QuadContourSet objects themselves are the artists
+                # They can be used directly in the artist list
+                cnt_col = [cnt, cnt_line]
 
             ax.text(0.5, 1.0, "CBF for {}".format(cbf_num), transform=ax.transAxes, va="bottom")
     if "Vh" in viz_opts:
