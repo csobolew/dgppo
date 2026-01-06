@@ -24,20 +24,41 @@ def train(args):
         os.environ["WANDB_MODE"] = "disabled"
         os.environ["JAX_DISABLE_JIT"] = "True"
 
+    # Prepare custom parameters for QuadrupedCorridor
+    corridor_kwargs = {}
+    if args.env == 'QuadrupedCorridor':
+        if hasattr(args, 'num_passages') and args.num_passages is not None:
+            corridor_kwargs['num_passages'] = args.num_passages
+        if hasattr(args, 'passageway_width') and args.passageway_width is not None:
+            corridor_kwargs['passageway_width'] = args.passageway_width
+        if hasattr(args, 'wall_thickness') and args.wall_thickness is not None:
+            corridor_kwargs['wall_thickness'] = args.wall_thickness
+        if hasattr(args, 'start_y') and args.start_y is not None:
+            corridor_kwargs['start_y'] = args.start_y
+        if hasattr(args, 'goal_y') and args.goal_y is not None:
+            corridor_kwargs['goal_y'] = args.goal_y
+    
     # create environments
+    # Only pass num_obs if it's provided and not QuadrupedCorridor (which doesn't use it)
+    env_kwargs = {}
+    if args.obs is not None and args.env != 'QuadrupedCorridor':
+        env_kwargs['num_obs'] = args.obs
+    
     env = make_env(
         env_id=args.env,
         num_agents=args.num_agents,
-        num_obs=args.obs,
         n_rays=args.n_rays,
         full_observation=args.full_observation,
+        **corridor_kwargs,
+        **env_kwargs
     )
     env_test = make_env(
         env_id=args.env,
         num_agents=args.num_agents,
-        num_obs=args.obs,
         n_rays=args.n_rays,
         full_observation=args.full_observation,
+        **corridor_kwargs,
+        **env_kwargs
     )
 
     # create algorithm
@@ -137,7 +158,8 @@ def main():
     parser.add_argument("--env", type=str, required=True)
     parser.add_argument("-n", "--num-agents", type=int, required=True)
     parser.add_argument("--algo", type=str, required=True)
-    parser.add_argument("--obs", type=int, required=True)
+    parser.add_argument("--obs", type=int, required=False, default=None,
+                        help="Number of random obstacles (not used for QuadrupedCorridor)")
 
     # custom arguments
     parser.add_argument("--seed", type=int, default=0)
@@ -168,6 +190,18 @@ def main():
     parser.add_argument("--use-lstm", action="store_true", default=False)
     parser.add_argument("--coef-ent", type=float, default=1e-2)
     parser.add_argument("--rnn-step", type=int, default=16)
+
+    # QuadrupedCorridor-specific arguments
+    parser.add_argument("--num-passages", type=int, default=None,
+                        help="Number of vertical passageways (QuadrupedCorridor only)")
+    parser.add_argument("--passageway-width", type=float, default=None,
+                        help="Width of narrow passages, normalized (QuadrupedCorridor only)")
+    parser.add_argument("--wall-thickness", type=float, default=None,
+                        help="Thickness of walls between passages, normalized (QuadrupedCorridor only)")
+    parser.add_argument("--start-y", type=float, default=None,
+                        help="Y position where agents start, normalized (QuadrupedCorridor only)")
+    parser.add_argument("--goal-y", type=float, default=None,
+                        help="Y position where goals are placed, normalized (QuadrupedCorridor only)")
 
     # default arguments
     parser.add_argument("--n-env-train", type=int, default=128)

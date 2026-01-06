@@ -36,14 +36,37 @@ def test(args):
     with open(os.path.join(args.path, "config.yaml"), "r") as f:
         config = yaml.load(f, Loader=yaml.UnsafeLoader)
 
+    # Prepare custom parameters for QuadrupedCorridor
+    corridor_kwargs = {}
+    env_id = config.env if args.env is None else args.env
+    if env_id == 'QuadrupedCorridor':
+        if hasattr(args, 'num_passages') and args.num_passages is not None:
+            corridor_kwargs['num_passages'] = args.num_passages
+        if hasattr(args, 'passageway_width') and args.passageway_width is not None:
+            corridor_kwargs['passageway_width'] = args.passageway_width
+        if hasattr(args, 'wall_thickness') and args.wall_thickness is not None:
+            corridor_kwargs['wall_thickness'] = args.wall_thickness
+        if hasattr(args, 'start_y') and args.start_y is not None:
+            corridor_kwargs['start_y'] = args.start_y
+        if hasattr(args, 'goal_y') and args.goal_y is not None:
+            corridor_kwargs['goal_y'] = args.goal_y
+    
     # create environments
     num_agents = config.num_agents if args.num_agents is None else args.num_agents
+    # Only pass num_obs if it's provided and not QuadrupedCorridor (which doesn't use it)
+    env_kwargs = {}
+    if env_id != 'QuadrupedCorridor':
+        obs_value = config.obs if args.obs is None else args.obs
+        if obs_value is not None:
+            env_kwargs['num_obs'] = obs_value
+    
     env = make_env(
-        env_id=config.env if args.env is None else args.env,
+        env_id=env_id,
         num_agents=num_agents,
-        num_obs=config.obs if args.obs is None else args.obs,
         max_step=args.max_step,
         full_observation=args.full_observation,
+        **corridor_kwargs,
+        **env_kwargs
     )
 
     # create algorithm
@@ -176,6 +199,18 @@ def main():
     parser.add_argument("--cpu", action="store_true", default=False)
     parser.add_argument("--max-step", type=int, default=None)
     parser.add_argument("--log", action="store_true", default=False)
+
+    # QuadrupedCorridor-specific arguments
+    parser.add_argument("--num-passages", type=int, default=None,
+                        help="Number of vertical passageways (QuadrupedCorridor only)")
+    parser.add_argument("--passageway-width", type=float, default=None,
+                        help="Width of narrow passages, normalized (QuadrupedCorridor only)")
+    parser.add_argument("--wall-thickness", type=float, default=None,
+                        help="Thickness of walls between passages, normalized (QuadrupedCorridor only)")
+    parser.add_argument("--start-y", type=float, default=None,
+                        help="Y position where agents start, normalized (QuadrupedCorridor only)")
+    parser.add_argument("--goal-y", type=float, default=None,
+                        help="Y position where goals are placed, normalized (QuadrupedCorridor only)")
 
     # default arguments
     parser.add_argument("-n", "--num-agents", type=int, default=None)
